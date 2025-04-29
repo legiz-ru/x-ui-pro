@@ -1,4 +1,3 @@
-
 #!/bin/bash
 #################### x-ui-pro v2.4.3 @ github.com/GFW4Fun ##############################################
 [[ $EUID -ne 0 ]] && echo "not root!" && sudo su -
@@ -11,6 +10,7 @@ msg_inf		 ' \/ __ | |  | __ |_) |_) / \ '	;
 msg_inf		 ' /\    |_| _|_   |   | \ \_/ '	; echo
 ##################################Variables#############################################################
 XUIDB="/etc/x-ui/x-ui.db";domain="";UNINSTALL="x";INSTALL="n";PNLNUM=1;CFALLOW="n";CLASH=0;CUSTOMWEBSUB=0
+http_port=80;https_port=443;sub2sing_port=8080;ssh_port=22;min_path_length=6;max_path_length=12;
 Pak=$(type apt &>/dev/null && echo "apt" || echo "yum")
 systemctl stop x-ui
 rm -rf /etc/systemd/system/x-ui.service
@@ -41,16 +41,26 @@ make_port() {
 		fi
 	done
 }
-sub_port=$(make_port)
-panel_port=$(make_port)
-web_path=$(tr -dc A-Za-z0-9 </dev/urandom | head -c "$(shuf -i 6-12 -n 1)")
-sub2singbox_path=$(tr -dc A-Za-z0-9 </dev/urandom | head -c "$(shuf -i 6-12 -n 1)")
-sub_path=$(tr -dc A-Za-z0-9 </dev/urandom | head -c "$(shuf -i 6-12 -n 1)")
-json_path=$(tr -dc A-Za-z0-9 </dev/urandom | head -c "$(shuf -i 6-12 -n 1)")
-panel_path=$(tr -dc A-Za-z0-9 </dev/urandom | head -c "$(shuf -i 6-12 -n 1)")
-ws_port=$(make_port)
-ws_path=$(tr -dc A-Za-z0-9 </dev/urandom | head -c "$(shuf -i 6-12 -n 1)")
-xhttp_path=$(tr -dc A-Za-z0-9 </dev/urandom | head -c "$(shuf -i 6-12 -n 1)")
+
+get_inc_by_1000_port() {
+    local port=$1
+    local max_port=65443
+
+    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
+        echo $(make_port) #fallback
+        return 1
+    fi
+
+    while [ $port -le $max_port ]; do
+        port=$((port + 1000))
+        if ! check_free $port; then
+            echo $port
+            return
+        fi
+    done
+
+    echo $(make_port) #fallback
+}
 
 ##################################Random Port and Path #################################################
 #RNDSTR=$(tr -dc A-Za-z0-9 </dev/urandom | head -c "$(shuf -i 6-12 -n 1)")
@@ -69,6 +79,12 @@ while [ "$#" -gt 0 ]; do
     -panel) PNLNUM="$2"; shift 2;;
     -subdomain) domain="$2"; shift 2;;
     -reality_domain) reality_domain="$2"; shift 2;;
+    -http_port) http_port="$2"; shift 2;;
+    -https_port) https_port="$2"; shift 2;;
+    -sub2sing_port) sub2sing_port="$2"; shift 2;;
+    -ssh_port) ssh_port="$2"; shift 2;;
+    -min_path_length) min_path_length="$2"; shift 2;;
+    -max_path_length) man_path_length="$2"; shift 2;;
     -ONLY_CF_IP_ALLOW) CFALLOW="$2"; shift 2;;
     -websub) CUSTOMWEBSUB="$2"; shift 2;;
     -clash) CLASH="$2"; shift 2;;
@@ -77,6 +93,25 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+if [[ $max_path_length -lt $min_path_length ]]; then
+  max_path_length=$min_path_length
+fi
+
+allowed_path_symbols='A-Za-z0-9\_-'
+sub_port=$(make_port)
+panel_port=$(make_port)
+web_path=$(tr -dc ${allowed_path_symbols} </dev/urandom | head -c "$(shuf -i $min_path_length-$max_path_length -n 1)")
+sub2singbox_path=$(tr -dc ${allowed_path_symbols} </dev/urandom | head -c "$(shuf -i $min_path_length-$max_path_length -n 1)")
+sub_path=$(tr -dc ${allowed_path_symbols} </dev/urandom | head -c "$(shuf -i $min_path_length-$max_path_length -n 1)")
+json_path=$(tr -dc ${allowed_path_symbols} </dev/urandom | head -c "$(shuf -i $min_path_length-$max_path_length -n 1)")
+panel_path=$(tr -dc ${allowed_path_symbols} </dev/urandom | head -c "$(shuf -i $min_path_length-$max_path_length -n 1)")
+ws_port=$(make_port)
+ws_path=$(tr -dc ${allowed_path_symbols} </dev/urandom | head -c "$(shuf -i $min_path_length-$max_path_length -n 1)")
+xhttp_path=$(tr -dc ${allowed_path_symbols} </dev/urandom | head -c "$(shuf -i $min_path_length-$max_path_length -n 1)")
+xray_port=$(get_inc_by_1000_port 443)
+www_port=$(get_inc_by_1000_port $xray_port)
+reality_port=$(get_inc_by_1000_port $www_port)
+https_port_suffix=$([ "$https_port" -eq 443 ] && echo "" || echo ":$https_port")
 
 ##############################Uninstall#################################################################
 UNINSTALL_XUI(){
@@ -86,8 +121,16 @@ UNINSTALL_XUI(){
 	$Pak -y purge nginx nginx-common nginx-core nginx-full python3-certbot-nginx
 	$Pak -y autoremove
 	$Pak -y autoclean
+	if pgrep -x "sub2sing-box" > /dev/null; then
+		echo "kill sub2sing-box..."
+		pkill -x "sub2sing-box"
+	fi
+	if [ -f "/usr/bin/sub2sing-box" ]; then
+		echo "delete sub2sing-box..."
+		rm -f /usr/bin/sub2sing-box
+	fi
 	rm -rf "/var/www/html/" "/etc/nginx/" "/usr/share/nginx/" 
-	crontab -l | grep -v "certbot\|x-ui\|cloudflareips" | crontab -
+	crontab -l | grep -v "certbot\|x-ui\|cloudflareips\|sub2sing-box" | crontab -
 }
 if [[ ${UNINSTALL} == *"y"* ]]; then
 	UNINSTALL_XUI	
@@ -136,13 +179,11 @@ if [[ ${INSTALL} == *"y"* ]]; then
         fi
 
 	$Pak -y update
-
 	$Pak -y install curl wget jq bash sudo nginx-full certbot python3-certbot-nginx sqlite3 ufw
-
 	systemctl daemon-reload && systemctl enable --now nginx
 fi
 systemctl stop nginx 
-fuser -k 80/tcp 80/udp 443/tcp 443/udp 2>/dev/null
+fuser -k $http_port/tcp $http_port/udp $https_port/tcp $https_port/udp 2>/dev/null
 ##################################GET SERVER IPv4-6#####################################################
 IP4_REGEX="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
 IP6_REGEX="([a-f0-9:]+:+)+[a-f0-9]+"
@@ -212,17 +253,17 @@ map \$ssl_preread_server_name \$sni_name {
 }
 
 upstream xray {
-    server 127.0.0.1:8443;
+    server 127.0.0.1:${xray_port};
 }
 
 upstream www {
-    server 127.0.0.1:7443;
+    server 127.0.0.1:${www_port};
 }
 
 server {
     proxy_protocol on;
     set_real_ip_from unix:;
-    listen          443;
+    listen          ${https_port};
     proxy_pass      \$sni_name;
     ssl_preread     on;
 }
@@ -234,11 +275,11 @@ grep -xqFR "load_module modules/ngx_stream_module.so;" /etc/nginx/* || sed -i '1
 grep -xqFR "load_module modules/ngx_stream_geoip2_module.so;" /etc/nginx* || sed -i '2s/^/load_module \/usr\/lib\/nginx\/modules\/ngx_stream_geoip2_module.so; /' /etc/nginx/nginx.conf
 grep -xqFR "worker_rlimit_nofile 16384;" /etc/nginx/* ||echo "worker_rlimit_nofile 16384;" >> /etc/nginx/nginx.conf
 sed -i "/worker_connections/c\worker_connections 4096;" /etc/nginx/nginx.conf
-cat > "/etc/nginx/sites-available/80.conf" << EOF
+cat > "/etc/nginx/sites-available/${http_port}.conf" << EOF
 server {
-    listen 80;
+    listen ${http_port};
     server_name ${domain} ${reality_domain};
-    return 301 https://\$host\$request_uri;
+    return 301 https://\$host$https_port_suffix\$request_uri;
 }
 EOF
 
@@ -247,8 +288,8 @@ cat > "/etc/nginx/sites-available/${domain}" << EOF
 server {
 	server_tokens off;
 	server_name ${domain};
-	listen 7443 ssl http2 proxy_protocol;
-	listen [::]:7443 ssl http2 proxy_protocol;
+	listen ${www_port} ssl http2 proxy_protocol;
+	listen [::]:${www_port} ssl http2 proxy_protocol;
 	index index.html index.htm index.php index.nginx-debian.html;
 	root /var/www/html/;
 	ssl_protocols TLSv1.2 TLSv1.3;
@@ -285,7 +326,7 @@ server {
 		proxy_set_header Host \$host;
 		proxy_set_header X-Real-IP \$remote_addr;
 		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-		proxy_pass http://127.0.0.1:8080/;
+		proxy_pass http://127.0.0.1:${sub2sing_port}/;
 		}
     # Path to open clash.yaml and generate YAML
     location ~ ^/${web_path}/clashmeta/(.+)$ {
@@ -395,8 +436,8 @@ cat > "/etc/nginx/sites-available/${reality_domain}" << EOF
 server {
 	server_tokens off;
 	server_name ${reality_domain};
-	listen 9443 ssl http2;
-	listen [::]:9443 ssl http2;
+	listen ${reality_port} ssl http2;
+	listen [::]:${reality_port} ssl http2;
 	index index.html index.htm index.php index.nginx-debian.html;
 	root /var/www/html/;
 	ssl_protocols TLSv1.2 TLSv1.3;
@@ -433,7 +474,7 @@ server {
 		proxy_set_header Host \$host;
 		proxy_set_header X-Real-IP \$remote_addr;
 		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-		proxy_pass http://127.0.0.1:8080/;
+		proxy_pass http://127.0.0.1:${sub2sing_port}/;
 		}
     # Path to open clash.yaml and generate YAML
     location ~ ^/${web_path}/clashmeta/(.+)$ {
@@ -544,7 +585,7 @@ if [[ -f "/etc/nginx/sites-available/${domain}" ]]; then
 	rm -f "/etc/nginx/sites-enabled/default" "/etc/nginx/sites-available/default"
 	ln -s "/etc/nginx/sites-available/${domain}" "/etc/nginx/sites-enabled/" 2>/dev/null
         ln -s "/etc/nginx/sites-available/${reality_domain}" "/etc/nginx/sites-enabled/" 2>/dev/null
-	ln -s "/etc/nginx/sites-available/80.conf" "/etc/nginx/sites-enabled/" 2>/dev/null
+	ln -s "/etc/nginx/sites-available/${http_port}.conf" "/etc/nginx/sites-enabled/" 2>/dev/null
 else
 	msg_err "${domain} nginx config not exist!" && exit 1
 fi
@@ -557,8 +598,8 @@ fi
 
 
 ##############################generate uri's###########################################################
-sub_uri=https://${domain}/${sub_path}/
-json_uri=https://${domain}/${web_path}?name=
+sub_uri="https://${domain}${https_port_suffix}/${sub_path}/"
+json_uri="https://${domain}${https_port_suffix}/${web_path}?name="
 ##############################generate keys###########################################################
 shor=($(openssl rand -hex 8) $(openssl rand -hex 8) $(openssl rand -hex 8) $(openssl rand -hex 8) $(openssl rand -hex 8) $(openssl rand -hex 8) $(openssl rand -hex 8) $(openssl rand -hex 8))
 
@@ -626,7 +667,7 @@ if [[ -f $XUIDB ]]; then
 	     '1',
              '0',
 	     '',
-             '8443',
+             '${xray_port}',
 	     'vless',
              '{
 	     "clients": [
@@ -653,14 +694,14 @@ if [[ -f $XUIDB ]]; then
     {
       "forceTls": "same",
       "dest": "${domain}",
-      "port": 443,
+      "port": ${https_port},
       "remark": ""
     }
   ],
   "realitySettings": {
     "show": false,
     "xver": 0,
-    "dest": "${reality_domain}:9443",
+    "dest": "${reality_domain}:${reality_port}",
     "serverNames": [
       "$reality_domain"
     ],
@@ -692,7 +733,7 @@ if [[ -f $XUIDB ]]; then
     }
   }
 }',
-             'inbound-8443',
+             'inbound-${xray_port}',
 	     '{
   "enabled": false,
   "destOverride": [
@@ -745,7 +786,7 @@ if [[ -f $XUIDB ]]; then
     {
       "forceTls": "tls",
       "dest": "${domain}",
-      "port": 443,
+      "port": ${https_port},
       "remark": ""
     }
   ],
@@ -809,7 +850,7 @@ if [[ -f $XUIDB ]]; then
     {
       "forceTls": "tls",
       "dest": "${domain}",
-      "port": 443,
+      "port": ${https_port},
       "remark": ""
     }
   ],
@@ -886,16 +927,16 @@ fi
 
 ######################enable bbr and tune system########################################################
 apt-get install -yqq --no-install-recommends ca-certificates
-echo "net.core.default_qdisc=fq" | tee -a /etc/sysctl.conf
-echo "net.ipv4.tcp_congestion_control=bbr" | tee -a /etc/sysctl.conf
-echo "fs.file-max=2097152" | tee -a /etc/sysctl.conf
-echo "net.ipv4.tcp_timestamps = 1" | tee -a /etc/sysctl.conf
-echo "net.ipv4.tcp_sack = 1" | tee -a /etc/sysctl.conf
-echo "net.ipv4.tcp_window_scaling = 1" | tee -a /etc/sysctl.conf
-echo "net.core.rmem_max = 16777216" | tee -a /etc/sysctl.conf
-echo "net.core.wmem_max = 16777216" | tee -a /etc/sysctl.conf
-echo "net.ipv4.tcp_rmem = 4096 87380 16777216" | tee -a /etc/sysctl.conf
-echo "net.ipv4.tcp_wmem = 4096 65536 16777216" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.core.default_qdisc[[:space:]]*=/d' /etc/sysctl.conf && echo "net.core.default_qdisc=fq" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.ipv4.tcp_congestion_control[[:space:]]*=/d' /etc/sysctl.conf && echo "net.ipv4.tcp_congestion_control=bbr" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*fs.file-max[[:space:]]*=/d' /etc/sysctl.conf && echo "fs.file-max=2097152 # Увеличить лимит открытых файлов" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.ipv4.tcp_timestamps[[:space:]]*=/d' /etc/sysctl.conf && echo "net.ipv4.tcp_timestamps=1 # Включение временных меток TCP" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.ipv4.tcp_sack[[:space:]]*=/d' /etc/sysctl.conf && echo "net.ipv4.tcp_sack=1 # Включение TCP Selective Acknowledgments" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.ipv4.tcp_window_scaling[[:space:]]*=/d' /etc/sysctl.conf && echo "net.ipv4.tcp_window_scaling=1 # Включаем масштабирование окон TCP" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.core.rmem_max[[:space:]]*=/d' /etc/sysctl.conf && echo "net.core.rmem_max=16777216 # Максимальный размер буферов для чтения" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.core.wmem_max[[:space:]]*=/d' /etc/sysctl.conf && echo "net.core.wmem_max=16777216 # Максимальный размер буферов для записи" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.ipv4.tcp_rmem[[:space:]]*=/d' /etc/sysctl.conf && echo "net.ipv4.tcp_rmem=4096 87380 16777216 # Настройки чтения буферов TCP" | tee -a /etc/sysctl.conf
+sed -i '/^[[:space:]]*net.ipv4.tcp_wmem[[:space:]]*=/d' /etc/sysctl.conf && echo "net.ipv4.tcp_wmem=4096 65536 16777216 # Настройки записи буферов TCP" | tee -a /etc/sysctl.conf
 
 sysctl -p
 
@@ -915,7 +956,7 @@ tar -xvzf /root/sub2sing-box_0.0.9_linux_amd64.tar.gz -C /root/ --strip-componen
 mv /root/sub2sing-box /usr/bin/
 chmod +x /usr/bin/sub2sing-box
 rm /root/sub2sing-box_0.0.9_linux_amd64.tar.gz
-su -c "/usr/bin/sub2sing-box server --bind 127.0.0.1 --port 8080 & disown" root
+su -c "/usr/bin/sub2sing-box server --bind 127.0.0.1 --port ${sub2sing_port} & disown" root
 
 ######################install_fake_site#################################################################
 
@@ -940,12 +981,12 @@ sudo mkdir -p "$DEST_DIR_SUB_PAGE"
 sudo curl -L "${URL_CLASH_SUB[$CLASH]}" -o "$DEST_FILE_CLASH_SUB"
 sudo curl -L "${URL_SUB_PAGE[$CUSTOMWEBSUB]}" -o "$DEST_FILE_SUB_PAGE"
 
-sed -i "s/\${DOMAIN}/$domain/g" "$DEST_FILE_SUB_PAGE"
-sed -i "s/\${DOMAIN}/$domain/g" "$DEST_FILE_CLASH_SUB"
+sed -i "s/\${DOMAIN}/$domain$https_port_suffix/g" "$DEST_FILE_SUB_PAGE"
+sed -i "s/\${DOMAIN}/$domain$https_port_suffix/g" "$DEST_FILE_CLASH_SUB"
 sed -i "s#\${SUB_JSON_PATH}#$json_path#g" "$DEST_FILE_SUB_PAGE"
 sed -i "s#\${SUB_PATH}#$sub_path#g" "$DEST_FILE_SUB_PAGE"
 sed -i "s#\${SUB_PATH}#$sub_path#g" "$DEST_FILE_CLASH_SUB"
-sed -i "s|sub.legiz.ru|$domain/$sub2singbox_path|g" "$DEST_FILE_SUB_PAGE"
+sed -i "s|sub.legiz.ru|$domain$https_port_suffix/$sub2singbox_path|g" "$DEST_FILE_SUB_PAGE"
 
 while true; do	
 	if [[ -n "$tg_escaped_link" ]]; then
@@ -958,15 +999,15 @@ sed -i -e "s|https://t.me/gozargah_marzban|$tg_escaped_link|g" -e "s|https://git
 
 ######################cronjob for ssl/reload service/cloudflareips######################################
 crontab -l | grep -v "certbot\|x-ui\|cloudflareips" | crontab -
-(crontab -l 2>/dev/null; echo '@reboot /usr/bin/sub2sing-box server --bind 127.0.0.1 --port 8080 > /dev/null 2>&1') | crontab -
+(crontab -l 2>/dev/null; echo "@reboot /usr/bin/sub2sing-box server --bind 127.0.0.1 --port $sub2sing_port > /dev/null 2>&1") | crontab -
 (crontab -l 2>/dev/null; echo '@daily x-ui restart > /dev/null 2>&1 && nginx -s reload;') | crontab -
 (crontab -l 2>/dev/null; echo '@weekly bash /etc/nginx/cloudflareips.sh > /dev/null 2>&1;') | crontab -
 (crontab -l 2>/dev/null; echo '@monthly certbot renew --nginx --non-interactive --post-hook "nginx -s reload" > /dev/null 2>&1;') | crontab -
 ##################################ufw###################################################################
 ufw disable
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
+ufw allow $ssh_port/tcp
+ufw allow $http_port/tcp
+ufw allow $https_port/tcp
 ufw --force enable  
 ##################################Show Details##########################################################
 
@@ -986,12 +1027,12 @@ if systemctl is-active --quiet x-ui; then clear
 #	fi
 
  msg_inf "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-	msg_inf "X-UI Secure Panel: https://${domain}/${panel_path}/\n"
+	msg_inf "X-UI Secure Panel: https://${domain}${https_port_suffix}/${panel_path}/\n"
  	echo -n "Username:  " && sqlite3 $XUIDB 'SELECT "username" FROM users;'
 	echo -n "Password:  " && sqlite3 $XUIDB 'SELECT "password" FROM users;'
 	msg_inf "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-  msg_inf "Web Sub Page your first client: https://${domain}/${web_path}?name=first\n"
-  msg_inf "Your local sub2sing-box instance: https://${domain}/$sub2singbox_path/\n"
+  msg_inf "Web Sub Page your first client: https://${domain}${https_port_suffix}/${web_path}?name=first\n"
+  msg_inf "Your local sub2sing-box instance: https://${domain}${https_port_suffix}/$sub2singbox_path/\n"
   msg_inf "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
 	msg_inf "Please Save this Screen!!"	
 else
