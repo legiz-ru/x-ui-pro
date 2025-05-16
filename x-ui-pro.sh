@@ -872,7 +872,7 @@ if systemctl is-active --quiet x-ui; then
 	x-ui restart
 else
 	PANEL=( "https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh"
-			"https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh"
+			"https://raw.githubusercontent.com/MHSanaei/3x-ui/refs/tags/v2.5.8/install.sh"
 			"https://raw.githubusercontent.com/FranzKafkaYu/x-ui/master/install_en.sh"
 		)
 
