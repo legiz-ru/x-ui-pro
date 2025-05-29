@@ -952,14 +952,14 @@ sed -i "s#\${SUB_PATH}#$sub_path#g" "$DEST_FILE_SUB_PAGE"
 sed -i "s#\${SUB_PATH}#$sub_path#g" "$DEST_FILE_CLASH_SUB"
 sed -i "s|sub.legiz.ru|$domain/$sub2singbox_path|g" "$DEST_FILE_SUB_PAGE"
 
-#while true; do	
-#	if [[ -n "$tg_escaped_link" ]]; then
-#		break
-#	fi
-#	echo -en "Enter your support link for web sub page (example https://t.me/durov/ ): " && read tg_escaped_link
-#done
+while true; do	
+	if [[ -n "$tg_escaped_link" ]]; then
+		break
+	fi
+	echo -en "Enter your support link for web sub page (example https://t.me/durov/ ): " && read tg_escaped_link
+done
 
-#sed -i -e "s|https://t.me/gozargah_marzban|$tg_escaped_link|g" -e "s|https://github.com/Gozargah/Marzban#donation|$tg_escaped_link|g" "$DEST_FILE_SUB_PAGE"
+sed -i -e "s|https://t.me/gozargah_marzban|$tg_escaped_link|g" -e "s|https://github.com/Gozargah/Marzban#donation|$tg_escaped_link|g" "$DEST_FILE_SUB_PAGE"
 
 ######################cronjob for ssl/reload service/cloudflareips######################################
 crontab -l | grep -v "certbot\|x-ui\|cloudflareips" | crontab -
@@ -995,8 +995,8 @@ if systemctl is-active --quiet x-ui; then clear
  	echo -e "Username:  ${config_username} \n" 
 	echo -e "Password:  ${config_password} \n" 
 	msg_inf "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-#  msg_inf "Web Sub Page your first client: https://${domain}/${web_path}?name=first\n"
-#  msg_inf "Your local sub2sing-box instance: https://${domain}/$sub2singbox_path/\n"
+  msg_inf "Web Sub Page your first client: https://${domain}/${web_path}?name=first\n"
+  msg_inf "Your local sub2sing-box instance: https://${domain}/$sub2singbox_path/\n"
   msg_inf "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
 	msg_inf "Please Save this Screen!!"	
 else
