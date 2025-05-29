@@ -924,7 +924,7 @@ su -c "/usr/bin/sub2sing-box server --bind 127.0.0.1 --port 8080 & disown" root
 
 ######################install_fake_site#################################################################
 
-sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/mozaroc/x-ui-pro/refs/heads/master/randomfakehtml.sh)"
+sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/legiz-ru/x-ui-pro/refs/heads/master/randomfakehtml.sh)"
 
 ######################install_web_sub_page##############################################################
 
